@@ -156,10 +156,12 @@ function createGreenGradient(context: ScriptableContext<"bar">) {
 
 export default function HistoryPage() {
   const [days, setDays] = useState<DaySummary[]>(() => getRecentDays());
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadHistory = () => {
       setDays(aggregateWeek(parseStoredLogs(localStorage.getItem(STORAGE_KEY))));
+      setIsLoading(false);
     };
 
     loadHistory();
@@ -255,30 +257,30 @@ export default function HistoryPage() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-black pb-10 text-white selection:bg-emerald-500/30">
+    <main className="app-shell min-h-screen overflow-hidden pb-28 text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
       <div className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.13),transparent_64%)]" />
 
-      <div className="relative mx-auto min-h-screen max-w-md">
-        <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-neutral-900 bg-black/75 p-6 pt-8 backdrop-blur-xl">
+      <div className="page-enter relative min-h-screen">
+        <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-white/10 bg-neutral-950/65 p-6 pt-8 backdrop-blur-2xl">
           <Link
             href="/"
-            className="-ml-2 rounded-full p-2 transition-all duration-300 hover:bg-neutral-900 active:scale-90"
+            className="-ml-2 rounded-full p-2 transition-all duration-300 hover:bg-white/10 active:scale-90"
             aria-label="Back to dashboard"
           >
             <ArrowLeft className="h-6 w-6" />
           </Link>
-          <h1 className="flex-1 pr-8 text-center text-xl font-bold tracking-tight">
+          <h1 className="gradient-heading flex-1 pr-8 text-center text-xl font-black">
             Weekly History
           </h1>
         </header>
 
-        <div className="flex flex-col gap-8 p-6">
-          <section className="history-fade-up relative overflow-hidden rounded-[30px] border border-neutral-800/80 bg-gradient-to-b from-neutral-900/90 to-neutral-950/80 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
-            <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="flex flex-col gap-8 p-6 md:px-8 md:py-6">
+          <section className="glass-card history-fade-up relative overflow-hidden rounded-[30px] p-5">
+            <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-green-500/10 blur-3xl" />
 
             <div className="relative mb-5 flex items-start justify-between">
               <div>
-                <div className="mb-2 flex items-center gap-2 text-emerald-400">
+                <div className="mb-2 flex items-center gap-2 text-green-400">
                   <CalendarDays className="h-4 w-4" />
                   <span className="text-[10px] font-bold uppercase tracking-[0.2em]">
                     Last 7 Days
@@ -294,8 +296,8 @@ export default function HistoryPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-3 py-2 text-right">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/80">
+              <div className="rounded-2xl border border-green-500/15 bg-green-500/10 px-3 py-2 text-right">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-green-400/80">
                   Daily Avg
                 </p>
                 <p className="mt-0.5 text-sm font-black text-emerald-100">
@@ -305,7 +307,7 @@ export default function HistoryPage() {
             </div>
 
             <div className="h-56">
-              <Bar data={chartData} options={chartOptions} />
+              {isLoading ? <div className="skeleton h-full rounded-2xl" /> : <Bar data={chartData} options={chartOptions} />}
             </div>
           </section>
 
@@ -315,7 +317,7 @@ export default function HistoryPage() {
                 Daily Breakdown
               </h2>
               <span className="flex items-center gap-1.5 text-xs font-bold text-neutral-500">
-                <Flame className="h-3.5 w-3.5 text-emerald-400" />
+                <Flame className="h-3.5 w-3.5 text-green-400" />
                 2,000 goal
               </span>
             </div>
@@ -330,7 +332,7 @@ export default function HistoryPage() {
                 return (
                   <article
                     key={day.key}
-                    className="history-fade-up group rounded-[24px] border border-neutral-800/70 bg-neutral-900/45 p-4 backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-700 hover:bg-neutral-900/75"
+                    className="glass-card history-fade-up group rounded-[24px] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-green-500/20"
                     style={{ animationDelay: `${120 + index * 55}ms` }}
                   >
                     <div className="mb-4 flex items-start justify-between">
@@ -344,7 +346,7 @@ export default function HistoryPage() {
                               {day.dateLabel}
                             </h3>
                             {day.isToday && (
-                              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-400">
+                              <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-green-400">
                                 Today
                               </span>
                             )}
@@ -378,7 +380,7 @@ export default function HistoryPage() {
 
                     <div className="h-1.5 overflow-hidden rounded-full bg-neutral-800/80">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-300 transition-all duration-1000 ease-out"
+                        className="h-full rounded-full bg-gradient-to-r from-green-600 via-green-500 to-green-300 transition-all duration-1000 ease-out"
                         style={{ width: `${calorieProgress}%` }}
                       />
                     </div>

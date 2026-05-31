@@ -38,8 +38,8 @@ const goalFields = [
     label: "Daily calorie goal",
     unit: "kcal",
     icon: Gauge,
-    color: "text-emerald-400",
-    iconBackground: "bg-emerald-500/10 border-emerald-500/20",
+    color: "text-green-400",
+    iconBackground: "bg-green-500/10 border-green-500/20",
   },
   {
     key: "protein",
@@ -195,10 +195,12 @@ export default function GoalsPage() {
   const [goals, setGoals] = useState<Goals>(DEFAULT_GOALS);
   const [streak, setStreak] = useState<StreakStats>({ current: 0, best: 0 });
   const [showToast, setShowToast] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setGoals(parseSavedGoals(localStorage.getItem(GOALS_KEY)));
     setStreak(calculateStreak(parseStoredLogs(localStorage.getItem(FOOD_LOGS_KEY))));
+    setIsLoading(false);
   }, []);
 
   const updateGoal = (key: keyof Goals, value: string) => {
@@ -215,31 +217,29 @@ export default function GoalsPage() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-black pb-10 text-white selection:bg-emerald-500/30">
+    <main className="app-shell min-h-screen overflow-hidden pb-28 text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
       <div className="pointer-events-none fixed inset-x-0 top-0 h-[28rem] bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.16),transparent_62%)]" />
 
-      <div className="relative mx-auto min-h-screen max-w-md">
-        <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-neutral-900 bg-black/75 p-6 pt-8 backdrop-blur-xl">
+      <div className="page-enter relative min-h-screen">
+        <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-white/10 bg-neutral-950/65 p-6 pt-8 backdrop-blur-2xl">
           <Link
             href="/"
-            className="-ml-2 rounded-full p-2 transition-all duration-300 hover:bg-neutral-900 active:scale-90"
+            className="-ml-2 rounded-full p-2 transition-all duration-300 hover:bg-white/10 active:scale-90"
             aria-label="Back to dashboard"
           >
             <ArrowLeft className="h-6 w-6" />
           </Link>
-          <h1 className="flex-1 pr-8 text-center text-xl font-bold tracking-tight">
+          <h1 className="gradient-heading flex-1 pr-8 text-center text-xl font-black">
             Goals &amp; Streak
           </h1>
         </header>
 
-        <div className="flex flex-col gap-8 p-6">
-          <section className="history-fade-up relative overflow-hidden rounded-[32px] border border-emerald-500/20 bg-gradient-to-b from-emerald-500/15 via-neutral-900/95 to-black p-6 text-center shadow-[0_20px_70px_rgba(16,185,129,0.14)]">
-            <div className="pointer-events-none absolute left-1/2 top-5 h-36 w-36 -translate-x-1/2 rounded-full bg-emerald-400/15 blur-3xl" />
-            <div className="goals-flame relative mx-auto mb-3 text-7xl drop-shadow-[0_0_24px_rgba(251,146,60,0.42)]">
-              🔥
-            </div>
+        <div className="flex flex-col gap-8 p-6 md:px-8 md:py-6">
+          <section className="glass-card history-fade-up relative overflow-hidden rounded-[32px] border-green-500/20 bg-green-500/10 p-6 text-center shadow-[0_20px_70px_rgba(34,197,94,0.14)]">
+            <div className="pointer-events-none absolute left-1/2 top-5 h-36 w-36 -translate-x-1/2 rounded-full bg-green-400/15 blur-3xl" />
+            <Flame className="goals-flame relative mx-auto mb-3 h-16 w-16 fill-green-500 text-green-400 drop-shadow-[0_0_24px_rgba(34,197,94,0.42)]" />
             <p className="relative text-7xl font-black tracking-tighter text-white">
-              {streak.current}
+              {isLoading ? <span className="skeleton mx-auto block h-16 w-20 rounded-xl" /> : streak.current}
             </p>
             <p className="relative mt-1 text-xs font-black uppercase tracking-[0.3em] text-emerald-300">
               Day Streak
@@ -272,7 +272,7 @@ export default function GoalsPage() {
                 return (
                   <label
                     key={field.key}
-                    className="history-fade-up group flex items-center gap-4 rounded-[22px] border border-neutral-800/70 bg-neutral-900/50 p-4 backdrop-blur-md transition-all duration-300 hover:border-neutral-700 hover:bg-neutral-900/80"
+                    className="glass-card history-fade-up group flex items-center gap-4 rounded-[22px] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-green-500/20"
                     style={{ animationDelay: `${120 + index * 60}ms` }}
                   >
                     <span className={`rounded-2xl border p-3 ${field.iconBackground}`}>
@@ -309,7 +309,7 @@ export default function GoalsPage() {
             <button
               type="button"
               onClick={handleSave}
-              className="mt-5 w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-green-400 py-4 text-[17px] font-black text-black shadow-[0_0_35px_rgba(16,185,129,0.28)] transition-all duration-300 hover:from-emerald-400 hover:to-green-300 active:scale-[0.98]"
+              className="mt-5 w-full rounded-2xl bg-green-500 py-4 text-[17px] font-black text-black shadow-[0_0_35px_rgba(34,197,94,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-400 active:scale-[0.98]"
             >
               Save Goals
             </button>
@@ -319,7 +319,7 @@ export default function GoalsPage() {
 
       {showToast && (
         <div className="fixed left-1/2 top-24 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300">
-          <div className="flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-3.5 font-bold text-black shadow-[0_0_40px_rgba(16,185,129,0.4)]">
+          <div className="flex items-center gap-2 rounded-full bg-green-500 px-5 py-3.5 font-bold text-black shadow-[0_0_40px_rgba(34,197,94,0.4)]">
             <CheckCircle2 className="h-5 w-5" />
             <span>Goals saved!</span>
           </div>

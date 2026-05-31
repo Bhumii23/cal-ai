@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Camera, Trash2, Loader2, Image as ImageIcon, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Camera, Trash2, Loader2, Image as ImageIcon, CheckCircle2, Flame } from "lucide-react";
 
 interface FoodLog {
   id: string;
@@ -21,6 +21,7 @@ export default function DiaryPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<Omit<FoodLog, "id"> | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [hasLoadedLogs, setHasLoadedLogs] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load from localStorage on mount
@@ -33,12 +34,15 @@ export default function DiaryPage() {
         console.error("Failed to parse food logs", e);
       }
     }
+    setHasLoadedLogs(true);
   }, []);
 
   // Save to localStorage when changed
   useEffect(() => {
-    localStorage.setItem("calAi_foodLogs", JSON.stringify(foodLogs));
-  }, [foodLogs]);
+    if (hasLoadedLogs) {
+      localStorage.setItem("calAi_foodLogs", JSON.stringify(foodLogs));
+    }
+  }, [foodLogs, hasLoadedLogs]);
 
   const totalCalories = foodLogs.reduce((sum, item) => sum + item.calories, 0);
 
@@ -125,25 +129,25 @@ export default function DiaryPage() {
   };
 
   return (
-    <main className="min-h-screen bg-black text-white selection:bg-emerald-500/30 pb-24 font-sans relative">
-      <div className="max-w-md mx-auto min-h-screen flex flex-col relative">
+    <main className="app-shell relative min-h-screen pb-48 font-sans text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
+      <div className="page-enter relative flex min-h-screen flex-col">
         {/* Header */}
-        <header className="flex items-center gap-4 p-6 pt-8 sticky top-0 bg-black/80 backdrop-blur-md z-10 border-b border-neutral-900">
+        <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-white/10 bg-neutral-950/65 p-6 pt-8 backdrop-blur-2xl">
           <Link
             href="/"
-            className="p-2 -ml-2 hover:bg-neutral-900 rounded-full transition-colors"
+            className="-ml-2 rounded-full p-2 transition-all duration-300 hover:bg-white/10 active:scale-90"
           >
             <ArrowLeft className="w-6 h-6" />
           </Link>
-          <h1 className="text-xl font-bold tracking-tight flex-1 text-center pr-8">
+          <h1 className="gradient-heading flex-1 pr-8 text-center text-xl font-black">
             Food Diary
           </h1>
         </header>
 
-        <div className="p-6 flex flex-col gap-8">
+        <div className="flex flex-col gap-8 p-6 md:px-8 md:py-6">
           {/* Upload Section */}
           <section className="flex flex-col gap-4">
-            <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-widest">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-green-400">
               Log Meal
             </h2>
             
@@ -159,18 +163,19 @@ export default function DiaryPage() {
               {!imagePreviewUrl ? (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex flex-col items-center justify-center gap-3 bg-neutral-900/40 border-2 border-dashed border-neutral-800 rounded-3xl h-48 hover:bg-neutral-900/80 transition-colors"
+                  className="glass-card group flex h-52 w-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-green-500/45 transition-all duration-300 hover:-translate-y-1 hover:border-green-400 hover:bg-green-500/10 active:scale-[0.98]"
                 >
-                  <div className="p-4 bg-neutral-800/80 rounded-full text-neutral-400">
-                    <Camera className="w-8 h-8" />
+                  <div className="rounded-full border border-green-500/25 bg-green-500/15 p-4 text-green-400 shadow-[0_0_30px_rgba(34,197,94,0.18)] transition-transform duration-300 group-hover:scale-110">
+                    <Camera className="h-8 w-8" />
                   </div>
-                  <span className="text-sm font-medium text-neutral-400">
-                    Tap to upload or take photo
+                  <span className="text-sm font-bold text-neutral-200">
+                    Tap to upload food photo
                   </span>
+                  <span className="text-xs font-medium text-neutral-500">Camera roll or camera</span>
                 </button>
               ) : (
                 <div className="flex flex-col gap-4">
-                  <div className="relative w-full rounded-[28px] overflow-hidden border border-neutral-800 bg-neutral-900/50 flex flex-col shadow-2xl">
+                  <div className="glass-card relative flex w-full flex-col overflow-hidden rounded-[28px]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={imagePreviewUrl}
@@ -193,14 +198,14 @@ export default function DiaryPage() {
                       <div className="p-4 flex gap-3 bg-neutral-900/80 backdrop-blur-md">
                         <button
                           onClick={() => fileInputRef.current?.click()}
-                          className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-neutral-800 rounded-2xl font-semibold text-sm hover:bg-neutral-700 transition-colors"
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/10 py-3.5 text-sm font-semibold transition-all duration-300 hover:bg-white/15 active:scale-[0.97]"
                         >
                           <ImageIcon className="w-4 h-4" />
                           Retake
                         </button>
                         <button
                           onClick={handleAnalyze}
-                          className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white text-black rounded-2xl font-bold text-sm hover:bg-neutral-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.15)]"
+                          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-green-500 py-3.5 text-sm font-black text-black shadow-[0_0_24px_rgba(34,197,94,0.25)] transition-all duration-300 hover:bg-green-400 active:scale-[0.97]"
                         >
                           <Camera className="w-4 h-4" />
                           Analyze Food
@@ -211,7 +216,7 @@ export default function DiaryPage() {
 
                   {/* Result Card */}
                   {analysisResult && (
-                    <div className="flex flex-col p-6 bg-gradient-to-b from-neutral-900 to-black border border-neutral-800 rounded-[28px] shadow-[0_8px_30px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="glass-card flex animate-in flex-col rounded-[28px] p-6 fade-in slide-in-from-bottom-4 duration-500">
                       <h3 className="text-2xl font-black mb-1 leading-tight tracking-tight">
                         {analysisResult.name}
                       </h3>
@@ -220,9 +225,9 @@ export default function DiaryPage() {
                         <span className="text-5xl font-black tracking-tighter text-white">
                           {analysisResult.calories}
                         </span>
-                        <div className="flex flex-col justify-end pb-1 text-emerald-400 font-bold">
+                        <div className="flex flex-col justify-end pb-1 font-bold text-green-400">
                           <span className="text-xl leading-none">kcal</span>
-                          <span className="text-lg leading-none">🔥</span>
+                          <Flame className="mt-1 h-4 w-4 fill-green-500 text-green-500" />
                         </div>
                       </div>
 
@@ -244,7 +249,7 @@ export default function DiaryPage() {
 
                       <button
                         onClick={handleAddToDiary}
-                        className="w-full py-4 bg-emerald-500 text-black font-black text-[17px] rounded-2xl hover:bg-emerald-400 active:scale-[0.98] transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+                        className="w-full rounded-2xl bg-green-500 py-4 text-[17px] font-black text-black shadow-[0_0_30px_rgba(34,197,94,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-400 active:scale-[0.98]"
                       >
                         Add to Diary
                       </button>
@@ -261,8 +266,12 @@ export default function DiaryPage() {
               Today&apos;s Log
             </h2>
 
-            {foodLogs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 bg-neutral-900/20 border border-neutral-800/30 rounded-3xl">
+            {!hasLoadedLogs ? (
+              <div className="flex flex-col gap-3">
+                {[0, 1].map((item) => <div key={item} className="skeleton h-20 rounded-3xl" />)}
+              </div>
+            ) : foodLogs.length === 0 ? (
+              <div className="glass-card flex flex-col items-center justify-center rounded-3xl py-10">
                 <p className="text-sm font-medium text-neutral-500">No meals logged yet today.</p>
               </div>
             ) : (
@@ -270,7 +279,7 @@ export default function DiaryPage() {
                 {foodLogs.map((log) => (
                   <div
                     key={log.id}
-                    className="flex items-center justify-between p-4.5 bg-neutral-900/40 border border-neutral-800/60 rounded-[24px] backdrop-blur-md group"
+                    className="glass-card group flex items-center justify-between rounded-[24px] p-4.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-green-500/20"
                   >
                     <div className="flex flex-col gap-1.5">
                       <h3 className="font-bold text-[15px] tracking-tight">{log.name}</h3>
@@ -282,7 +291,7 @@ export default function DiaryPage() {
                     </div>
                     
                     <div className="flex items-center gap-4">
-                      <span className="font-black text-emerald-400 tracking-tight">{log.calories} kcal</span>
+                      <span className="font-black tracking-tight text-green-400">{log.calories} kcal</span>
                       <button
                         onClick={() => handleDelete(log.id)}
                         className="p-2.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors active:scale-90"
@@ -299,9 +308,9 @@ export default function DiaryPage() {
         </div>
 
         {/* Footer Running Total */}
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/95 to-transparent pointer-events-none z-20">
-          <div className="max-w-md mx-auto">
-            <div className="flex items-center justify-between p-5 bg-neutral-900/90 backdrop-blur-xl border border-neutral-800 rounded-[24px] shadow-2xl pointer-events-auto">
+        <div className="fixed bottom-20 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-transparent p-6 pointer-events-none md:bottom-0 md:left-64">
+          <div className="mx-auto">
+            <div className="glass-card pointer-events-auto flex items-center justify-between rounded-[24px] p-5">
               <span className="font-bold text-neutral-400 tracking-wide">Total Calories</span>
               <div className="flex items-end gap-1.5">
                 <span className="text-2xl font-black text-white tracking-tighter">{totalCalories}</span>
@@ -314,7 +323,7 @@ export default function DiaryPage() {
         {/* Success Toast Notification */}
         {showToast && (
           <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
-            <div className="flex items-center gap-2 px-5 py-3.5 bg-emerald-500 text-black font-bold rounded-full shadow-[0_0_40px_rgba(16,185,129,0.4)]">
+            <div className="flex items-center gap-2 rounded-full bg-green-500 px-5 py-3.5 font-bold text-black shadow-[0_0_40px_rgba(34,197,94,0.4)]">
               <CheckCircle2 className="w-5 h-5" />
               <span>Food added!</span>
             </div>
