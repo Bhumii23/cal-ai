@@ -180,7 +180,7 @@ export default function DiaryPage() {
                     <img
                       src={imagePreviewUrl}
                       alt="Food preview"
-                      className={`w-full h-64 object-cover transition-opacity duration-300 ${isAnalyzing ? 'opacity-50 grayscale' : 'opacity-100'}`}
+                      className={`h-72 w-full bg-black/30 object-contain sm:h-80 md:h-[28rem] transition-opacity duration-300 ${isAnalyzing ? 'opacity-50 grayscale' : 'opacity-100'}`}
                     />
                     
                     {/* Analyzing Overlay Spinner */}
