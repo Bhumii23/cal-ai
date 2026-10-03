@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BarChart3, BookOpen, Flame, Home, Target, UserRound } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { getCurrentUserAsync } from "@/lib/auth";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
@@ -15,25 +16,30 @@ const navItems = [
 
 export default function DesktopSidebar() {
   const pathname = usePathname();
-  const [profile, setProfile] = useState({ name: "BH", initials: "BH" });
+  const [profile, setProfile] = useState({ name: "User", initials: "U" });
 
   useEffect(() => {
-    const rawUser = localStorage.getItem("calAi_user");
-    if (!rawUser) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const user = await getCurrentUserAsync();
+        if (cancelled || !user) return;
 
-    try {
-      const user = JSON.parse(rawUser) as { name?: string };
-      const name = user.name?.trim() || "BH";
+      const name = user.name?.trim() || "User";
       const initials = name
         .split(/\s+/)
         .slice(0, 2)
         .map((part) => part[0])
         .join("")
         .toUpperCase();
-      setProfile({ name, initials: initials || "BH" });
-    } catch (error) {
-      console.error("Failed to parse saved user", error);
-    }
+      setProfile({ name, initials: initials || "U" });
+      } catch (error) {
+        console.error("Failed to read saved user", error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
   if (pathname === "/auth") {

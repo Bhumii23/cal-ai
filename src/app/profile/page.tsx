@@ -3,11 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, CheckCircle2, Flame, LogOut, Save, Target, Utensils, UserRound } from "lucide-react";
-
-const USER_KEY = "calAi_user";
-const FOOD_LOGS_KEY = "calAi_foodLogs";
-const GOALS_KEY = "calAi_goals";
-const PROFILE_KEY = "calAi_profile";
+import { getCurrentUserAsync, logout, updateCurrentUserProfile, useRequireAuth } from "@/lib/auth";
+import { loadFoodLogs, loadGoals, loadProfileExtras, saveGoals, saveProfileExtras } from "@/lib/db";
 
 interface FoodLog {
   loggedAt?: string;
@@ -18,7 +15,6 @@ interface FoodLog {
 interface User {
   name: string;
   email: string;
-  password?: string;
   createdAt?: string;
 }
 
@@ -35,7 +31,7 @@ interface Settings {
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  name: "BH",
+  name: "User",
   email: "",
   age: "",
   weight: "",
@@ -68,26 +64,8 @@ function getLogDateKey(log: FoodLog, todayKey: string) {
   return Number.isNaN(date.getTime()) ? todayKey : getDateKey(date);
 }
 
-function parseLogs(rawLogs: string | null): FoodLog[] {
-  if (!rawLogs) return [];
-  try {
-    const parsed: unknown = JSON.parse(rawLogs);
-    if (Array.isArray(parsed)) return parsed.filter((log): log is FoodLog => typeof log === "object" && log !== null);
-    if (typeof parsed === "object" && parsed !== null) {
-      return Object.entries(parsed).flatMap(([date, logs]) =>
-        Array.isArray(logs)
-          ? logs.filter((log): log is FoodLog => typeof log === "object" && log !== null).map((log) => ({ ...log, date: log.date || date }))
-          : []
-      );
-    }
-  } catch (error) {
-    console.error("Failed to parse food logs", error);
-  }
-  return [];
-}
-
 function getInitials(name: string) {
-  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "BH";
+  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "U";
 }
 
 function getStreak(logs: FoodLog[]) {
@@ -104,32 +82,24 @@ function getStreak(logs: FoodLog[]) {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { authLoading } = useRequireAuth();
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [password, setPassword] = useState("");
   const [memberSince, setMemberSince] = useState("");
   const [stats, setStats] = useState({ meals: 0, trackedDays: 0, streak: 0 });
   const [showToast, setShowToast] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
-    const rawUser = localStorage.getItem(USER_KEY);
-    const rawProfile = localStorage.getItem(PROFILE_KEY);
-    const rawGoals = localStorage.getItem(GOALS_KEY);
-    const logs = parseLogs(localStorage.getItem(FOOD_LOGS_KEY));
-    let user: User = { name: "BH", email: "" };
-    let profile: Partial<Settings> = {};
-    let goals: Partial<Settings> = {};
-
-    try {
-      if (rawUser) user = { ...user, ...(JSON.parse(rawUser) as User) };
-      if (rawProfile) profile = JSON.parse(rawProfile) as Partial<Settings>;
-      if (rawGoals) goals = JSON.parse(rawGoals) as Partial<Settings>;
-    } catch (error) {
-      console.error("Failed to parse saved profile", error);
-    }
+    if (authLoading) return;
+    void (async () => {
+      const currentUser = await getCurrentUserAsync();
+      if (!currentUser) return;
+      const [savedGoals, logs] = await Promise.all([loadGoals(), loadFoodLogs()]);
+      const user: User = { name: currentUser.name, email: currentUser.email, createdAt: currentUser.createdAt };
+      const profile: Partial<Settings> = loadProfileExtras();
+      const goals: Partial<Settings> = savedGoals;
 
     const createdAt = user.createdAt || new Date().toISOString();
-    if (rawUser && !user.createdAt) localStorage.setItem(USER_KEY, JSON.stringify({ ...user, createdAt }));
-    setPassword(user.password || "");
     setMemberSince(new Date(createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
     setSettings({
       ...DEFAULT_SETTINGS,
@@ -139,30 +109,46 @@ export default function ProfilePage() {
       email: user.email || "",
     });
     const streak = getStreak(logs);
-    setStats({ meals: logs.length, trackedDays: streak.trackedDays, streak: streak.current });
-  }, []);
+      setStats({ meals: logs.length, trackedDays: streak.trackedDays, streak: streak.current });
+    })();
+  }, [authLoading]);
 
   const updateSetting = (key: keyof Settings, value: string) => {
-    setSettings((current) => ({ ...current, [key]: ["calories", "protein", "carbs", "fat"].includes(key) ? Math.max(0, Number(value)) : value }));
+    if ((["calories", "protein", "carbs", "fat"] as const).includes(key as "calories")) {
+      const next = Number(value);
+      setSettings((current) => ({ ...current, [key]: Number.isFinite(next) ? Math.max(0, next) : 0 }));
+      return;
+    }
+    setSettings((current) => ({ ...current, [key]: value }));
   };
 
-  const handleSave = () => {
-    const rawUser = localStorage.getItem(USER_KEY);
-    let createdAt = new Date().toISOString();
+  const handleSave = async () => {
+    setSaveError("");
     try {
-      if (rawUser) createdAt = (JSON.parse(rawUser) as User).createdAt || createdAt;
-    } catch {}
-    localStorage.setItem(USER_KEY, JSON.stringify({ name: settings.name.trim() || "BH", email: settings.email.trim().toLowerCase(), password, createdAt }));
-    localStorage.setItem(PROFILE_KEY, JSON.stringify({ age: settings.age, weight: settings.weight, height: settings.height }));
-    localStorage.setItem(GOALS_KEY, JSON.stringify({ calories: settings.calories, protein: settings.protein, carbs: settings.carbs, fat: settings.fat }));
-    setShowToast(true);
-    window.setTimeout(() => setShowToast(false), 2400);
+      const updated = await updateCurrentUserProfile({ name: settings.name, email: settings.email });
+      saveProfileExtras({ age: settings.age, weight: settings.weight, height: settings.height });
+      await saveGoals({ calories: settings.calories, protein: settings.protein, carbs: settings.carbs, fat: settings.fat });
+      setSettings((current) => ({ ...current, name: updated.name, email: updated.email }));
+      setShowToast(true);
+      window.setTimeout(() => setShowToast(false), 2400);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save profile.");
+    }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
+  const handleLogout = async () => {
+    // Only the session is cleared; food logs and goals are kept.
+    await logout();
     router.push("/auth");
   };
+
+  if (authLoading) {
+    return (
+      <main className="app-shell min-h-screen pb-28 text-white md:pb-8 md:pl-64">
+        <div className="p-6 md:px-8"><div className="skeleton h-48 rounded-[28px]" /></div>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell min-h-screen pb-28 text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
@@ -175,7 +161,7 @@ export default function ProfilePage() {
         <div className="grid gap-6 p-6 md:grid-cols-[minmax(280px,34fr)_minmax(0,66fr)] md:gap-8 md:px-8">
           <section className="card-shimmer glass-card h-fit rounded-[28px] p-6 text-center">
             <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-green-400/30 bg-green-500/15 text-3xl font-black text-green-200 shadow-[0_0_40px_rgba(34,197,94,0.22)]">{getInitials(settings.name)}</div>
-            <h2 className="gradient-heading mt-5 text-2xl font-black">{settings.name || "BH"}</h2>
+            <h2 className="gradient-heading mt-5 text-2xl font-black">{settings.name || "User"}</h2>
             <p className="mt-1 text-sm font-medium text-neutral-500">{settings.email || "No email added"}</p>
             <p className="mt-4 text-[10px] font-black uppercase tracking-[0.18em] text-neutral-600">Member since {memberSince || "Today"}</p>
 
@@ -205,6 +191,8 @@ export default function ProfilePage() {
                 <Input label="Fat goal" type="number" value={String(settings.fat)} onChange={(value) => updateSetting("fat", value)} suffix="g" />
               </div>
             </SettingsCard>
+
+            {saveError && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-sm font-semibold text-red-300">{saveError}</p>}
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <button type="button" onClick={handleSave} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-sm font-black text-black shadow-[0_0_30px_rgba(34,197,94,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-400 active:scale-[0.98]">

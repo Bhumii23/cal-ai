@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     const groq = new Groq({ apiKey });
     const completion = await groq.chat.completions.create({
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      model: "qwen/qwen3.6-27b",
       messages: [
         {
           role: "user",
@@ -55,18 +55,40 @@ export async function POST(req: Request) {
     }
 
     // Clean up potential markdown formatting (```json ... ```)
-    const cleanJson = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
+    // const cleanJson = responseText.replace(/```json/gi, "").replace(/```/g, "").trim();
     
-    const parsedData = JSON.parse(cleanJson);
+    // const parsedData = JSON.parse(cleanJson);
 
-    // Map the response fields
+    // Remove <think>...</think> if present
+let cleanText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, "");
+
+// Remove markdown code blocks
+cleanText = cleanText
+  .replace(/```json/gi, "")
+  .replace(/```/g, "")
+  .trim();
+
+// Extract only the JSON object
+const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+
+if (!jsonMatch) {
+  throw new Error("No valid JSON found in AI response:\n" + cleanText);
+}
+
+const parsedData = JSON.parse(jsonMatch[0]);
+
+    // Map the response fields (LLM may return strings — coerce safely).
+    const toNonNegative = (value: unknown) => {
+      const num = Number(value);
+      return Number.isFinite(num) ? Math.max(0, num) : 0;
+    };
     const foodItem = {
-      name: parsedData.foodName || "Unknown Food",
-      calories: parsedData.calories || 0,
-      protein: parsedData.protein || 0,
-      carbs: parsedData.carbs || 0,
-      fat: parsedData.fat || 0,
-      servingSize: parsedData.servingSize || "Unknown",
+      name: String(parsedData.foodName || "Unknown Food"),
+      calories: toNonNegative(parsedData.calories),
+      protein: toNonNegative(parsedData.protein),
+      carbs: toNonNegative(parsedData.carbs),
+      fat: toNonNegative(parsedData.fat),
+      servingSize: String(parsedData.servingSize || "Unknown"),
     };
 
     return NextResponse.json(foodItem);

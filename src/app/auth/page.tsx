@@ -1,26 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Flame, LockKeyhole, Mail, UserRound } from "lucide-react";
+import { getCurrentUserAsync, login, resetPassword, signInWithGoogle, signup } from "@/lib/auth";
+import { isSupabaseConfigured } from "@/lib/supabaseClient";
 
-const USER_KEY = "calAi_user";
-
-interface SavedUser {
-  name: string;
-  email: string;
-  password: string;
-}
-
-type AuthMode = "login" | "signup";
-
-function GoogleIcon() {
-  return (
-    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-black text-blue-600">
-      G
-    </span>
-  );
-}
+type AuthMode = "login" | "signup" | "forgot";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -31,56 +17,75 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Already logged in -> go home instead of showing the form again.
+  useEffect(() => {
+    void (async () => {
+      if (await getCurrentUserAsync()) router.replace("/");
+    })();
+  }, [router]);
+
+  const handleGoogle = async () => {
+    setError("");
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google login failed.");
+    }
+  };
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
     setError("");
+    setSuccess("");
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
-
-    if (mode === "signup") {
-      if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-        setError("Please complete every field.");
-        return;
-      }
-      if (password.length < 6) {
-        setError("Password must be at least 6 characters.");
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError("Passwords do not match.");
-        return;
-      }
-
-      const user: SavedUser = { name: name.trim(), email: email.trim().toLowerCase(), password };
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-      router.push("/");
-      return;
-    }
-
-    const rawUser = localStorage.getItem(USER_KEY);
-    if (!rawUser) {
-      setError("No account found. Create an account to get started.");
-      return;
-    }
-
+    setSuccess("");
+    setIsSubmitting(true);
     try {
-      const user = JSON.parse(rawUser) as SavedUser;
-      if (user.email !== email.trim().toLowerCase() || user.password !== password) {
-        setError("Incorrect email or password. Please try again.");
+      if (mode === "signup") {
+        if (!name.trim() || !email.trim() || !password || !confirmPassword) {
+          throw new Error("Please complete every field.");
+        }
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match.");
+        }
+        await signup(name, email, password);
+        router.replace("/");
+        router.refresh();
         return;
       }
-      router.push("/");
-    } catch {
-      setError("Your saved account could not be read. Please sign up again.");
+      if (mode === "forgot") {
+        if (!password || !confirmPassword) {
+          throw new Error("Please enter and confirm your new password.");
+        }
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match.");
+        }
+        await resetPassword(email, password);
+        setSuccess("Password updated. Please log in with your new password.");
+        setPassword("");
+        setConfirmPassword("");
+        setMode("login");
+        return;
+      }
+      await login(email, password);
+      router.replace("/");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-green-950 via-neutral-950 to-black px-5 py-10 text-white selection:bg-green-500/30">
+    <main className="hero-band relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-green-950 via-neutral-950 to-black px-5 py-10 text-white selection:bg-green-500/30">
       <div className="pointer-events-none absolute -left-24 top-[-8rem] h-96 w-96 rounded-full bg-green-500/15 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-36 right-[-5rem] h-96 w-96 rounded-full bg-emerald-400/10 blur-3xl" />
 
@@ -117,11 +122,11 @@ export default function AuthPage() {
           <Field icon={Mail} label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" autoComplete="email" />
           <Field
             icon={LockKeyhole}
-            label="Password"
+            label={mode === "forgot" ? "New Password" : "Password"}
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={setPassword}
-            placeholder="Enter your password"
+            placeholder={mode === "forgot" ? "Enter a new password (min 6 chars)" : "Enter your password"}
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             action={
               <button type="button" onClick={() => setShowPassword((current) => !current)} className="text-neutral-500 transition-colors hover:text-green-400" aria-label={showPassword ? "Hide password" : "Show password"}>
@@ -129,34 +134,47 @@ export default function AuthPage() {
               </button>
             }
           />
-          {mode === "signup" && (
-            <Field icon={LockKeyhole} label="Confirm Password" type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirm your password" autoComplete="new-password" />
+          {mode !== "login" && (
+            <Field icon={LockKeyhole} label={mode === "forgot" ? "Confirm New Password" : "Confirm Password"} type={showPassword ? "text" : "password"} value={confirmPassword} onChange={setConfirmPassword} placeholder="Confirm your password" autoComplete="new-password" />
           )}
 
           {mode === "login" && (
-            <button type="button" className="-mt-1 self-end text-xs font-bold text-green-400 transition-colors hover:text-green-300">
+            <button type="button" onClick={() => switchMode("forgot")} className="-mt-1 self-end text-xs font-bold text-green-400 transition-colors hover:text-green-300">
               Forgot password?
+            </button>
+          )}
+          {mode === "forgot" && (
+            <button type="button" onClick={() => switchMode("login")} className="-mt-1 self-end text-xs font-bold text-green-400 transition-colors hover:text-green-300">
+              Back to login
             </button>
           )}
 
           {error && <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-sm font-semibold text-red-300">{error}</p>}
+          {success && <p className="rounded-xl border border-green-500/20 bg-green-500/10 px-3 py-2.5 text-sm font-semibold text-green-300">{success}</p>}
 
-          <button type="submit" className="group mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-sm font-black text-black shadow-[0_0_30px_rgba(34,197,94,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-400 active:scale-[0.98]">
-            {mode === "login" ? "Login" : "Create Account"}
+          <button type="submit" disabled={isSubmitting} className="group mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 py-3.5 text-sm font-black text-black shadow-[0_0_30px_rgba(34,197,94,0.3)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60">
+            {isSubmitting ? "Please wait..." : mode === "login" ? "Login" : mode === "signup" ? "Create Account" : "Reset Password"}
             <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
           </button>
         </form>
 
-        <div className="my-6 flex items-center gap-3">
-          <span className="h-px flex-1 bg-white/10" />
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-600">Or continue with</span>
-          <span className="h-px flex-1 bg-white/10" />
-        </div>
-
-        <button type="button" className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-neutral-200 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 active:scale-[0.98]">
-          <GoogleIcon />
-          Continue with Google
-        </button>
+        {isSupabaseConfigured() ? (
+          <>
+            <div className="my-6 flex items-center gap-3">
+              <span className="h-px flex-1 bg-white/10" />
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-neutral-600">Or continue with</span>
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
+            <button type="button" onClick={handleGoogle} className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-neutral-200 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 active:scale-[0.98]">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-black text-blue-600">G</span>
+              Continue with Google
+            </button>
+          </>
+        ) : (
+          <p className="mt-6 text-center text-[11px] font-medium leading-relaxed text-neutral-600">
+            Demo auth: accounts are stored only in this browser with hashed passwords. Add Supabase keys to enable Google login + cloud sync.
+          </p>
+        )}
       </section>
     </main>
   );

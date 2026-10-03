@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Flame, Play, Plus, Sparkles } from "lucide-react";
-
-const FOOD_LOGS_KEY = "calAi_foodLogs";
-const GOALS_KEY = "calAi_goals";
+import { ArrowRight, BarChart3, Camera, Check, Flame, Play, Plus, Sparkles } from "lucide-react";
+import { useRequireAuth } from "@/lib/auth";
+import { addFoodLog, loadFoodLogs, loadGoals } from "@/lib/db";
 
 interface FoodLog {
   id?: string;
@@ -72,46 +71,6 @@ function getLogDateKey(log: FoodLog, todayKey: string) {
   return Number.isNaN(parsedDate.getTime()) ? todayKey : getDateKey(parsedDate);
 }
 
-function parseStoredLogs(rawLogs: string | null): FoodLog[] {
-  if (!rawLogs) return [];
-
-  try {
-    const parsed: unknown = JSON.parse(rawLogs);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((log): log is FoodLog => typeof log === "object" && log !== null);
-    }
-    if (typeof parsed === "object" && parsed !== null) {
-      return Object.entries(parsed).flatMap(([date, logs]) =>
-        Array.isArray(logs)
-          ? logs
-              .filter((log): log is FoodLog => typeof log === "object" && log !== null)
-              .map((log) => ({ ...log, date: log.date || date }))
-          : []
-      );
-    }
-  } catch (error) {
-    console.error("Failed to parse food logs", error);
-  }
-
-  return [];
-}
-
-function parseSavedGoals(rawGoals: string | null): Goals {
-  if (!rawGoals) return DEFAULT_GOALS;
-  try {
-    const parsed = JSON.parse(rawGoals) as Partial<Goals>;
-    return {
-      calories: Number(parsed.calories) || DEFAULT_GOALS.calories,
-      protein: Number(parsed.protein) || DEFAULT_GOALS.protein,
-      carbs: Number(parsed.carbs) || DEFAULT_GOALS.carbs,
-      fat: Number(parsed.fat) || DEFAULT_GOALS.fat,
-    };
-  } catch (error) {
-    console.error("Failed to parse saved goals", error);
-    return DEFAULT_GOALS;
-  }
-}
-
 function toNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -176,24 +135,35 @@ function FeatureImage({ src, alt }: { src: string; alt: string }) {
 }
 
 export default function Home() {
+  // Protected: useRequireAuth sends logged-out visitors to
+  // /auth (login/signup) first, so this UI only renders after login.
+  const { user, authLoading } = useRequireAuth();
   const [logs, setLogs] = useState<FoodLog[]>([]);
   const [goals, setGoals] = useState<Goals>(DEFAULT_GOALS);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadDashboard = () => {
-      setLogs(parseStoredLogs(localStorage.getItem(FOOD_LOGS_KEY)));
-      setGoals(parseSavedGoals(localStorage.getItem(GOALS_KEY)));
-      setIsLoading(false);
+    if (authLoading) return;
+    const loadDashboard = async () => {
+      try {
+        setLogs(await loadFoodLogs());
+        setGoals(await loadGoals());
+      } catch (err) {
+        console.error("Failed to load dashboard", err);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    loadDashboard();
-    window.addEventListener("storage", loadDashboard);
-    window.addEventListener("focus", loadDashboard);
+    const onStorage = () => void loadDashboard();
+    const onFocus = () => void loadDashboard();
+    void loadDashboard();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", onFocus);
     return () => {
-      window.removeEventListener("storage", loadDashboard);
-      window.removeEventListener("focus", loadDashboard);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onFocus);
     };
-  }, []);
+  }, [authLoading]);
 
   useEffect(() => {
     const revealElements = document.querySelectorAll<HTMLElement>("[data-reveal]");
@@ -208,7 +178,7 @@ export default function Home() {
     );
     revealElements.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
-  }, []);
+  }, [authLoading]);
 
   const todayKey = getDateKey(new Date());
   const todayLogs = logs.filter((log) => getLogDateKey(log, todayKey) === todayKey);
@@ -228,34 +198,53 @@ export default function Home() {
     { label: "Fat", value: totals.fat, goal: goals.fat, color: "#fb7185" },
   ];
 
-  const handleQuickAdd = (food: (typeof QUICK_FOODS)[number]) => {
-    const newLog: FoodLog = {
-      ...food,
-      id: crypto.randomUUID(),
-      loggedAt: new Date().toISOString(),
-    };
-    const updatedLogs = [newLog, ...logs];
-    localStorage.setItem(FOOD_LOGS_KEY, JSON.stringify(updatedLogs));
-    setLogs(updatedLogs);
+  const handleQuickAdd = async (food: (typeof QUICK_FOODS)[number]) => {
+    try {
+      const newLog = await addFoodLog({ ...food, loggedAt: new Date().toISOString() });
+      setLogs((prev) => [newLog, ...prev]);
+    } catch (err) {
+      console.error("Failed to quick-add food", err);
+    }
   };
+
+  if (authLoading) {
+    // Logged-out users are being sent to /auth (login/signup).
+    // Show a neutral loader so the dashboard never flashes first.
+    return (
+      <main className="app-shell flex min-h-screen items-center justify-center pb-24 text-white md:pb-0 md:pl-64">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-green-500/20 border-t-green-500" />
+          <p className="text-sm font-bold text-neutral-400">Checking your login…</p>
+        </div>
+      </main>
+    );
+  }
+
+  const firstName = user?.name?.split(" ")?.[0] || "there";
+  const initials = (user?.name?.trim() || "U")
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "U";
 
   return (
     <main className="app-shell min-h-screen pb-24 text-white selection:bg-green-500/30 md:pb-0 md:pl-64">
       <div className="page-enter min-h-screen">
-        <section className="relative overflow-hidden border-b border-green-500/15 bg-gradient-to-br from-green-950 via-neutral-950 to-black px-6 py-16 shadow-[0_18px_50px_rgba(0,0,0,0.35)] md:px-10 md:py-24 lg:px-16">
+        <section className="hero-band relative overflow-hidden border-b border-green-500/15 bg-gradient-to-br from-green-950 via-neutral-950 to-black px-6 py-16 shadow-[0_18px_50px_rgba(0,0,0,0.35)] md:px-10 md:py-24 lg:px-16">
           <div className="pointer-events-none absolute -right-16 -top-12 h-72 w-72 rounded-full bg-green-500/20 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 left-1/3 h-60 w-60 rounded-full bg-emerald-400/10 blur-3xl" />
           <div className="relative flex items-start justify-between gap-6">
             <div className="max-w-4xl">
               <p className="text-[10px] font-black uppercase tracking-[0.28em] text-green-400">AI-powered nutrition tracking</p>
               <h1 className="animated-gradient-text heading-font mt-5 text-5xl font-black tracking-[-0.06em] sm:text-6xl lg:text-8xl">Snap. Analyze. Track.</h1>
-              <p className="mt-5 max-w-2xl text-sm font-medium leading-7 text-neutral-400 sm:text-base">Turn every plate into clear, useful nutrition insights. Track calories and macros in seconds, then build healthier habits meal by meal.</p>
+              <p className="mt-5 max-w-2xl text-sm font-medium leading-7 text-neutral-400 sm:text-base">Hey {firstName} 👋 Turn every plate into clear, useful nutrition insights. Track calories and macros in seconds, then build healthier habits meal by meal.</p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <a href="#dashboard" className="flex items-center gap-2 rounded-full bg-green-500 px-5 py-3 text-sm font-black text-neutral-950 transition-all duration-300 hover:-translate-y-1 hover:bg-green-400 hover:shadow-[0_12px_28px_rgba(34,197,94,0.3)]">Start Tracking <ArrowRight className="h-4 w-4" /></a>
                 <a href="#features" className="flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-5 py-3 text-sm font-black text-white transition-all duration-300 hover:-translate-y-1 hover:border-green-400/50 hover:bg-green-500/10"><Play className="h-4 w-4 fill-white" /> Watch Demo</a>
               </div>
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-green-400/30 bg-green-500/15 text-sm font-black text-green-100 shadow-[0_0_24px_rgba(34,197,94,0.25)] md:hidden">BH</div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-green-400/30 bg-green-500/15 text-sm font-black text-green-100 shadow-[0_0_24px_rgba(34,197,94,0.25)] md:hidden">{initials}</div>
           </div>
           <div className="relative mt-10 flex items-center gap-2 text-xs font-bold text-green-300">
             <Flame className="h-4 w-4 fill-green-500 text-green-500" />
@@ -306,6 +295,28 @@ export default function Home() {
                 ))}
               </div>
             </section>
+
+            <Link href="/diary" className="card-shimmer glass-card group flex items-center gap-4 rounded-2xl border-green-500/25 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-green-500/40 hover:bg-green-500/10">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-green-500/25 bg-green-500/15 shadow-[0_0_24px_rgba(34,197,94,0.2)]">
+                <Camera className="h-6 w-6 text-green-400 transition-transform duration-300 group-hover:scale-110" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-black text-white">Snap your meal</span>
+                <span className="mt-0.5 block truncate text-xs font-medium text-neutral-500">AI photo logging with instant macros</span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-green-400 transition-transform duration-300 group-hover:translate-x-1" />
+            </Link>
+
+            <Link href="/history" className="glass-card group flex items-center gap-4 rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-green-500/25 hover:bg-green-500/5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                <BarChart3 className="h-6 w-6 text-green-400 transition-transform duration-300 group-hover:scale-110" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-black text-white">Weekly progress</span>
+                <span className="mt-0.5 block truncate text-xs font-medium text-neutral-500">{todayLogs.length} {todayLogs.length === 1 ? "meal" : "meals"} logged today · view trends</span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-neutral-500 transition-all duration-300 group-hover:translate-x-1 group-hover:text-green-400" />
+            </Link>
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">

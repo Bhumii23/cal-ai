@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowLeft, Camera, Trash2, Loader2, Image as ImageIcon, CheckCircle2, Flame } from "lucide-react";
+import { useRequireAuth } from "@/lib/auth";
+import { addFoodLog, deleteFoodLog, loadFoodLogs } from "@/lib/db";
 
 interface FoodLog {
   id: string;
@@ -14,7 +16,23 @@ interface FoodLog {
   loggedAt?: string;
 }
 
+function getDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getLogDateKey(log: FoodLog, todayKey: string) {
+  const rawDate = log.loggedAt;
+  if (!rawDate) return todayKey;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) return rawDate;
+  const parsed = new Date(rawDate);
+  return Number.isNaN(parsed.getTime()) ? todayKey : getDateKey(parsed);
+}
+
 export default function DiaryPage() {
+  const { authLoading } = useRequireAuth();
   const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -24,37 +42,46 @@ export default function DiaryPage() {
   const [hasLoadedLogs, setHasLoadedLogs] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load from localStorage on mount
+  // Load from Supabase (or localStorage fallback) after auth is ready
   useEffect(() => {
-    const savedLogs = localStorage.getItem("calAi_foodLogs");
-    if (savedLogs) {
+    if (authLoading) return;
+    void (async () => {
       try {
-        setFoodLogs(JSON.parse(savedLogs));
+        setFoodLogs(await loadFoodLogs());
       } catch (e) {
-        console.error("Failed to parse food logs", e);
+        console.error("Failed to load food logs", e);
+      } finally {
+        setHasLoadedLogs(true);
       }
-    }
-    setHasLoadedLogs(true);
-  }, []);
+    })();
+  }, [authLoading]);
 
-  // Save to localStorage when changed
-  useEffect(() => {
-    if (hasLoadedLogs) {
-      localStorage.setItem("calAi_foodLogs", JSON.stringify(foodLogs));
-    }
-  }, [foodLogs, hasLoadedLogs]);
-
-  const totalCalories = foodLogs.reduce((sum, item) => sum + item.calories, 0);
+  const todayKey = getDateKey(new Date());
+  const todayLogs = foodLogs.filter((log) => getLogDateKey(log, todayKey) === todayKey);
+  const totalCalories = todayLogs.reduce((sum, item) => sum + (Number(item.calories) || 0), 0);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedImage(file);
-      const url = URL.createObjectURL(file);
-      setImagePreviewUrl(url);
-      setAnalysisResult(null); // Clear previous result if any
+    // Reset the input so picking the same photo again still fires onChange.
+    e.target.value = "";
+    if (!file) return;
+    // Keep uploads small so the base64 body doesn't exceed server limits.
+    if (file.size > 4 * 1024 * 1024) {
+      alert("That photo is too large. Please pick an image under 4MB.");
+      return;
     }
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setSelectedImage(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setAnalysisResult(null); // Clear previous result if any
   };
+
+  // Free the preview URL when leaving the page.
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    };
+  }, [imagePreviewUrl]);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -91,9 +118,15 @@ export default function DiaryPage() {
         const result = await response.json();
         setAnalysisResult(result);
       } else {
-        const errData = await response.json();
-        alert(`Failed to analyze: ${errData.error || 'Unknown error'}`);
-        console.error("Failed to analyze image via API", errData);
+        let message = "Unknown error";
+        try {
+          const errData = await response.json();
+          message = errData.error || message;
+        } catch {
+          message = `Server returned ${response.status}`;
+        }
+        alert(`Failed to analyze: ${message}`);
+        console.error("Failed to analyze image via API", message);
       }
     } catch (error: unknown) {
       alert(`Error: ${error instanceof Error ? error.message : "Failed to analyze image"}`);
@@ -103,18 +136,30 @@ export default function DiaryPage() {
     }
   };
 
-  const handleAddToDiary = () => {
+  const handleAddToDiary = async () => {
     if (!analysisResult) return;
 
-    const newFood: FoodLog = {
-      ...analysisResult,
-      id: crypto.randomUUID(),
-      loggedAt: new Date().toISOString(),
+    const toNonNegative = (value: unknown) => {
+      const num = Number(value);
+      return Number.isFinite(num) ? Math.max(0, num) : 0;
     };
+    try {
+      const newFood = await addFoodLog({
+        name: String(analysisResult.name || "Logged meal"),
+        calories: toNonNegative(analysisResult.calories),
+        protein: toNonNegative(analysisResult.protein),
+        carbs: toNonNegative(analysisResult.carbs),
+        fat: toNonNegative(analysisResult.fat),
+        loggedAt: new Date().toISOString(),
+      });
+      setFoodLogs((prev) => [newFood, ...prev]);
+    } catch (err) {
+      console.error("Failed to save food log", err);
+      return;
+    }
 
-    setFoodLogs((prev) => [newFood, ...prev]);
-    
     // Reset states
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     setSelectedImage(null);
     setImagePreviewUrl(null);
     setAnalysisResult(null);
@@ -124,9 +169,22 @@ export default function DiaryPage() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     setFoodLogs((prev) => prev.filter((log) => log.id !== id));
+    try {
+      await deleteFoodLog(id);
+    } catch (err) {
+      console.error("Failed to delete food log", err);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <main className="app-shell relative min-h-screen pb-48 text-white md:pb-8 md:pl-64">
+        <div className="p-6 md:px-8"><div className="skeleton h-48 rounded-[28px]" /></div>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell relative min-h-screen pb-48 font-sans text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
@@ -185,7 +243,7 @@ export default function DiaryPage() {
                     
                     {/* Analyzing Overlay Spinner */}
                     {isAnalyzing && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-10">
+                      <div className="img-overlay-dark absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-10">
                         <Loader2 className="w-10 h-10 text-white animate-spin mb-4 shadow-lg" />
                         <span className="text-white font-bold tracking-wide drop-shadow-md">
                           Analyzing your food...
@@ -270,13 +328,13 @@ export default function DiaryPage() {
               <div className="flex flex-col gap-3">
                 {[0, 1].map((item) => <div key={item} className="skeleton h-20 rounded-3xl" />)}
               </div>
-            ) : foodLogs.length === 0 ? (
+            ) : todayLogs.length === 0 ? (
               <div className="glass-card flex flex-col items-center justify-center rounded-3xl py-10">
                 <p className="text-sm font-medium text-neutral-500">No meals logged yet today.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {foodLogs.map((log) => (
+                {todayLogs.map((log) => (
                   <div
                     key={log.id}
                     className="glass-card group flex items-center justify-between rounded-[24px] p-4.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-green-500/20"

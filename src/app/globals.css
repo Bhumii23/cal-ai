@@ -228,3 +228,190 @@ h3,
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Light / dark theme (toggled via <html class="light|dark">, default dark) ---------- */
+html.light {
+  color-scheme: light;
+  --background: #f2f6f3;
+  --foreground: #0f172a;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Unlayered rules win over Tailwind's @layer utilities, so these flip the
+   dark-hardcoded surfaces without touching any page code. */
+html.light .app-shell {
+  background:
+    radial-gradient(circle at 50% -12%, rgba(34, 197, 94, 0.16), transparent 34rem),
+    linear-gradient(160deg, #ffffff 0%, #eef4f1 55%, #e4f0e8 100%);
+}
+
+html.light .glass-card {
+  border-color: rgba(15, 23, 42, 0.09);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+html.light .gradient-heading {
+  background: linear-gradient(110deg, #0f172a 10%, #334155 55%, #16a34a);
+  background-clip: text;
+  color: transparent;
+}
+
+html.light .animated-gradient-text {
+  background: linear-gradient(100deg, #0f172a 10%, #15803d 35%, #16a34a 50%, #15803d 65%, #0f172a 90%);
+  background-size: 240% auto;
+  background-clip: text;
+  color: transparent;
+}
+
+html.light .skeleton {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+html.light .feature-pill {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #15803d;
+}
+
+html.light .hero-band {
+  background: linear-gradient(135deg, #ecfdf5 0%, #f8fafc 55%, #eef2f7 100%);
+}
+
+/* Text flips (dark surfaces become light, so light text must go dark). */
+html.light .text-white {
+  color: #0f172a;
+}
+
+html.light .text-neutral-100 {
+  color: #111827;
+}
+
+html.light .text-neutral-200 {
+  color: #1f2937;
+}
+
+/* Photo analyzing overlay stays dark by design. */
+html.light .img-overlay-dark,
+html.light .img-overlay-dark .text-white {
+  color: #fff;
+}
+
+/* Bright accents need darkening to stay readable on white. */
+html.light .text-green-400 {
+  color: #16a34a;
+}
+
+html.light .text-green-300 {
+  color: #15803d;
+}
+
+html.light .text-green-100 {
+  color: #065f46;
+}
+
+html.light .text-emerald-100 {
+  color: #065f46;
+}
+
+html.light .text-blue-100 {
+  color: #1e40af;
+}
+
+html.light .text-amber-100 {
+  color: #92400e;
+}
+
+html.light .text-red-100 {
+  color: #b91c1c;
+}
+
+/* Dark translucent surfaces become light tints. */
+html.light .bg-black\/20 {
+  background-color: rgba(15, 23, 42, 0.04);
+}
+
+html.light .bg-black\/25 {
+  background-color: rgba(15, 23, 42, 0.05);
+}
+
+html.light .bg-black\/30 {
+  background-color: rgba(15, 23, 42, 0.06);
+}
+
+html.light .bg-black\/35 {
+  background-color: rgba(15, 23, 42, 0.05);
+}
+
+html.light .bg-black\/50 {
+  background-color: rgba(15, 23, 42, 0.06);
+}
+
+html.light .bg-neutral-950\/55 {
+  background-color: rgba(255, 255, 255, 0.88);
+}
+
+html.light .bg-neutral-950\/65 {
+  background-color: rgba(255, 255, 255, 0.85);
+}
+
+html.light .bg-neutral-950\/70 {
+  background-color: rgba(255, 255, 255, 0.88);
+}
+
+html.light .bg-neutral-950\/80 {
+  background-color: rgba(248, 250, 252, 0.94);
+}
+
+html.light .bg-neutral-900\/80 {
+  background-color: rgba(255, 255, 255, 0.94);
+}
+
+html.light .bg-neutral-800\/80 {
+  background-color: #e2e8f0;
+}
+
+html.light .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.04);
+}
+
+html.light .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.07);
+}
+
+html.light .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+html.light .border-white\/20 {
+  border-color: rgba(15, 23, 42, 0.16);
+}
+
+html.light .border-neutral-800 {
+  border-color: #e2e8f0;
+}
+
+html.light .hover\:bg-white\/5:hover {
+  background-color: rgba(15, 23, 42, 0.05);
+}
+
+html.light .hover\:bg-white\/10:hover {
+  background-color: rgba(15, 23, 42, 0.08);
+}
+
+html.light .hover\:bg-white\/15:hover {
+  background-color: rgba(15, 23, 42, 0.1);
+}
+
+html.light .hover\:text-neutral-200:hover {
+  color: #0f172a;
+}
+
+/* Green tint banner on the dashboard. */
+html.light section[class*="from-green-500"] {
+  background: #ecfdf5;
+  border-color: rgba(34, 197, 94, 0.3);
+}

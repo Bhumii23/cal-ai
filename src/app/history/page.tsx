@@ -14,11 +14,12 @@ import {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import { ArrowLeft, CalendarDays, Flame } from "lucide-react";
+import { useRequireAuth } from "@/lib/auth";
+import { loadFoodLogs, loadGoals } from "@/lib/db";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Filler);
 
 const CALORIE_GOAL = 2000;
-const STORAGE_KEY = "calAi_foodLogs";
 
 interface FoodLog {
   calories?: number;
@@ -81,41 +82,12 @@ function getLogDateKey(log: FoodLog, todayKey: string) {
     return todayKey;
   }
 
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    return rawDate;
+  }
+
   const parsedDate = new Date(rawDate);
   return Number.isNaN(parsedDate.getTime()) ? todayKey : getDateKey(parsedDate);
-}
-
-function parseStoredLogs(rawLogs: string | null): FoodLog[] {
-  if (!rawLogs) {
-    return [];
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(rawLogs);
-
-    if (Array.isArray(parsed)) {
-      return parsed.filter(
-        (log): log is FoodLog => typeof log === "object" && log !== null
-      );
-    }
-
-    if (typeof parsed === "object" && parsed !== null) {
-      return Object.entries(parsed).flatMap(([date, logs]) =>
-        Array.isArray(logs)
-          ? logs
-              .filter(
-                (log): log is FoodLog =>
-                  typeof log === "object" && log !== null
-              )
-              .map((log) => ({ ...log, date: log.date || date }))
-          : []
-      );
-    }
-  } catch (error) {
-    console.error("Failed to parse weekly food logs", error);
-  }
-
-  return [];
 }
 
 function aggregateWeek(logs: FoodLog[]) {
@@ -155,23 +127,35 @@ function createGreenGradient(context: ScriptableContext<"bar">) {
 }
 
 export default function HistoryPage() {
+  const { authLoading } = useRequireAuth();
   const [days, setDays] = useState<DaySummary[]>(() => getRecentDays());
+  const [calorieGoal, setCalorieGoal] = useState(CALORIE_GOAL);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadHistory = () => {
-      setDays(aggregateWeek(parseStoredLogs(localStorage.getItem(STORAGE_KEY))));
-      setIsLoading(false);
+    if (authLoading) return;
+    const loadHistory = async () => {
+      try {
+        const [logs, goals] = await Promise.all([loadFoodLogs(), loadGoals()]);
+        setDays(aggregateWeek(logs));
+        if (Number.isFinite(goals.calories) && goals.calories > 0) {
+          setCalorieGoal(goals.calories);
+        }
+      } catch (err) {
+        console.error("Failed to load history", err);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    loadHistory();
-    window.addEventListener("storage", loadHistory);
-    return () => window.removeEventListener("storage", loadHistory);
-  }, []);
+    void loadHistory();
+    const onStorage = () => void loadHistory();
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [authLoading]);
 
   const totalCalories = days.reduce((sum, day) => sum + day.calories, 0);
-  const activeDays = days.filter((day) => day.calories > 0).length;
-  const averageCalories = activeDays > 0 ? Math.round(totalCalories / activeDays) : 0;
+  const averageCalories = days.length > 0 ? Math.round(totalCalories / days.length) : 0;
 
   const chartData = useMemo(
     () => ({
@@ -234,7 +218,7 @@ export default function HistoryPage() {
       },
       y: {
         beginAtZero: true,
-        suggestedMax: CALORIE_GOAL,
+        suggestedMax: calorieGoal,
         border: {
           display: false,
         },
@@ -255,6 +239,14 @@ export default function HistoryPage() {
       },
     },
   };
+
+  if (authLoading) {
+    return (
+      <main className="app-shell min-h-screen overflow-hidden pb-28 text-white md:pb-8 md:pl-64">
+        <div className="p-6 md:px-8"><div className="skeleton h-48 rounded-[28px]" /></div>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell min-h-screen overflow-hidden pb-28 text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
@@ -318,14 +310,14 @@ export default function HistoryPage() {
               </h2>
               <span className="flex items-center gap-1.5 text-xs font-bold text-neutral-500">
                 <Flame className="h-3.5 w-3.5 text-green-400" />
-                2,000 goal
+                {Math.round(calorieGoal).toLocaleString()} goal
               </span>
             </div>
 
             <div className="flex flex-col gap-3">
               {days.map((day, index) => {
                 const calorieProgress = Math.min(
-                  (day.calories / CALORIE_GOAL) * 100,
+                  (day.calories / Math.max(calorieGoal, 1)) * 100,
                   100
                 );
 

@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Award, Beef, CheckCircle2, Flame, Gauge, Wheat } from "lucide-react";
-
-const FOOD_LOGS_KEY = "calAi_foodLogs";
-const GOALS_KEY = "calAi_goals";
+import { useRequireAuth } from "@/lib/auth";
+import { loadFoodLogs, loadGoals, saveGoals } from "@/lib/db";
 
 interface FoodLog {
   loggedAt?: string;
@@ -96,39 +95,6 @@ function getLogDateKey(log: FoodLog, todayKey: string) {
   return Number.isNaN(parsedDate.getTime()) ? todayKey : getDateKey(parsedDate);
 }
 
-function parseStoredLogs(rawLogs: string | null): FoodLog[] {
-  if (!rawLogs) {
-    return [];
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(rawLogs);
-
-    if (Array.isArray(parsed)) {
-      return parsed.filter(
-        (log): log is FoodLog => typeof log === "object" && log !== null
-      );
-    }
-
-    if (typeof parsed === "object" && parsed !== null) {
-      return Object.entries(parsed).flatMap(([date, logs]) =>
-        Array.isArray(logs)
-          ? logs
-              .filter(
-                (log): log is FoodLog =>
-                  typeof log === "object" && log !== null
-              )
-              .map((log) => ({ ...log, date: log.date || date }))
-          : []
-      );
-    }
-  } catch (error) {
-    console.error("Failed to parse food logs for streak", error);
-  }
-
-  return [];
-}
-
 function calculateStreak(logs: FoodLog[]): StreakStats {
   const todayKey = getDateKey(new Date());
   const loggedDates = new Set(logs.map((log) => getLogDateKey(log, todayKey)));
@@ -155,26 +121,6 @@ function calculateStreak(logs: FoodLog[]): StreakStats {
   return { current, best };
 }
 
-function parseSavedGoals(rawGoals: string | null): Goals {
-  if (!rawGoals) {
-    return DEFAULT_GOALS;
-  }
-
-  try {
-    const parsed = JSON.parse(rawGoals) as Partial<Goals>;
-
-    return {
-      calories: Number(parsed.calories) || DEFAULT_GOALS.calories,
-      protein: Number(parsed.protein) || DEFAULT_GOALS.protein,
-      carbs: Number(parsed.carbs) || DEFAULT_GOALS.carbs,
-      fat: Number(parsed.fat) || DEFAULT_GOALS.fat,
-    };
-  } catch (error) {
-    console.error("Failed to parse saved goals", error);
-    return DEFAULT_GOALS;
-  }
-}
-
 function getMotivationalMessage(streak: number) {
   if (streak === 0) {
     return "Start your journey!";
@@ -192,29 +138,51 @@ function getMotivationalMessage(streak: number) {
 }
 
 export default function GoalsPage() {
+  const { authLoading } = useRequireAuth();
   const [goals, setGoals] = useState<Goals>(DEFAULT_GOALS);
   const [streak, setStreak] = useState<StreakStats>({ current: 0, best: 0 });
   const [showToast, setShowToast] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setGoals(parseSavedGoals(localStorage.getItem(GOALS_KEY)));
-    setStreak(calculateStreak(parseStoredLogs(localStorage.getItem(FOOD_LOGS_KEY))));
-    setIsLoading(false);
-  }, []);
+    if (authLoading) return;
+    void (async () => {
+      try {
+        setGoals(await loadGoals());
+        setStreak(calculateStreak(await loadFoodLogs()));
+      } catch (err) {
+        console.error("Failed to load goals", err);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [authLoading]);
 
   const updateGoal = (key: keyof Goals, value: string) => {
+    const next = Number(value);
     setGoals((currentGoals) => ({
       ...currentGoals,
-      [key]: Math.max(0, Number(value)),
+      [key]: Number.isFinite(next) ? Math.max(0, next) : 0,
     }));
   };
 
-  const handleSave = () => {
-    localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+  const handleSave = async () => {
+    try {
+      await saveGoals(goals);
+    } catch (err) {
+      console.error("Failed to save goals", err);
+    }
     setShowToast(true);
     window.setTimeout(() => setShowToast(false), 2600);
   };
+
+  if (authLoading) {
+    return (
+      <main className="app-shell min-h-screen overflow-hidden pb-28 text-white md:pb-8 md:pl-64">
+        <div className="p-6 md:px-8"><div className="skeleton h-48 rounded-[28px]" /></div>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell min-h-screen overflow-hidden pb-28 text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
