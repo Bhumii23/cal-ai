@@ -415,3 +415,104 @@ html.light section[class*="from-green-500"] {
   background: #ecfdf5;
   border-color: rgba(34, 197, 94, 0.3);
 }
+
+/* ---------- Light-mode completeness pass ----------
+   The app hardcodes dark surfaces (text-white, neutral-400/500/600,
+   bg-black, green-950 gradients). Without these flips the toggle changes
+   the <html> class but the page still looks dark. */
+html.light .text-neutral-300 {
+  color: #334155;
+}
+
+html.light .text-neutral-400 {
+  color: #475569;
+}
+
+html.light .text-neutral-500 {
+  color: #475569;
+}
+
+html.light .text-neutral-600 {
+  color: #334155;
+}
+
+html.light .text-neutral-700 {
+  color: #334155;
+}
+
+html.light .text-green-500 {
+  color: #16a34a;
+}
+
+html.light .text-green-200 {
+  color: #065f46;
+}
+
+html.light .fill-white {
+  fill: #0f172a;
+}
+
+html.light .text-neutral-500.hover\:text-neutral-200:hover,
+html.light .hover\:text-neutral-200:hover {
+  color: #0f172a;
+}
+
+/* Solid black surfaces (e.g. footer) become light. */
+html.light .bg-black {
+  background-color: #f8fafc;
+}
+
+html.light footer.bg-black {
+  background-color: #f1f5f9;
+}
+
+/* Dark gradient stops become light tints. */
+html.light .from-green-950 {
+  --tw-gradient-from: #d1fae5 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(209, 250, 229, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+html.light .via-neutral-950 {
+  --tw-gradient-to: rgba(248, 250, 252, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), #f8fafc var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+
+html.light .to-black {
+  --tw-gradient-to: #f8fafc var(--tw-gradient-to-position);
+}
+
+html.light .from-green-500\/15 {
+  --tw-gradient-from: rgba(34, 197, 94, 0.18) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(34, 197, 94, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+html.light .to-neutral-900\/60 {
+  --tw-gradient-to: rgba(241, 245, 249, 0.9) var(--tw-gradient-to-position);
+}
+
+html.light .from-black {
+  --tw-gradient-from: #f8fafc var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(248, 250, 252, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+/* Form fields + placeholders stay readable on light inputs. */
+html.light input::placeholder {
+  color: #94a3b8;
+}
+
+html.light .placeholder\:text-neutral-700::placeholder {
+  color: #94a3b8;
+}
+
+/* Nav / sidebar active surfaces keep contrast on white. */
+html.light .bg-green-500\/15 {
+  background-color: rgba(34, 197, 94, 0.14);
+}
+
+/* Photo overlay + loader intentionally stay dark (see .img-overlay-dark). */
+html.light .bg-black\/40:not(.img-overlay-dark) {
+  background-color: rgba(15, 23, 42, 0.08);
+}

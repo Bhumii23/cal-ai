@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import localFont from "next/font/local";
 import BottomNav from "@/components/BottomNav";
 import DesktopSidebar from "@/components/DesktopSidebar";
@@ -29,17 +28,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        {/* Set theme before paint: stored choice wins, else system preference.
+            Plain <script> (not next/script) so it always runs synchronously
+            before first paint, avoiding a dark->light flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('calAi_theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}var r=document.documentElement;r.classList.toggle('light',t==='light');r.classList.toggle('dark',t!=='light');r.style.colorScheme=t;}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Set theme before paint: stored choice wins, else system preference. */}
-        <Script
-          id="calai-theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('calAi_theme');if(!t){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.classList.toggle('light',t==='light');document.documentElement.classList.toggle('dark',t!=='light');}catch(e){}})();`,
-          }}
-        />
         <ThemeProvider>
           {children}
           <DesktopSidebar />
