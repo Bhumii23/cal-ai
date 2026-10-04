@@ -20,7 +20,7 @@ export default function BottomNav() {
   }
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-neutral-950/70 shadow-[0_-12px_40px_rgba(0,0,0,0.22)] backdrop-blur-2xl md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-neutral-950/70 shadow-[0_-12px_40px_rgba(0,0,0,0.22)] backdrop-blur-2xl md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       <div className="mx-auto grid h-20 max-w-md grid-cols-5">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href;
