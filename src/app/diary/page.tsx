@@ -337,19 +337,19 @@ export default function DiaryPage() {
                 {todayLogs.map((log) => (
                   <div
                     key={log.id}
-                    className="glass-card group flex items-center justify-between rounded-[24px] p-4.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-green-500/20"
+                    className="glass-card group flex items-center justify-between gap-3 rounded-[24px] p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-green-500/20"
                   >
-                    <div className="flex flex-col gap-1.5">
-                      <h3 className="font-bold text-[15px] tracking-tight">{log.name}</h3>
-                      <div className="flex gap-3 text-[11px] font-bold tracking-wide">
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <h3 className="break-words font-bold text-[15px] leading-snug tracking-tight">{log.name}</h3>
+                      <div className="flex flex-wrap gap-3 text-[11px] font-bold tracking-wide">
                         <span className="text-blue-400/90">{log.protein}g <span className="text-neutral-500">P</span></span>
                         <span className="text-amber-400/90">{log.carbs}g <span className="text-neutral-500">C</span></span>
                         <span className="text-red-400/90">{log.fat}g <span className="text-neutral-500">F</span></span>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-4">
-                      <span className="font-black tracking-tight text-green-400">{log.calories} kcal</span>
+
+                    <div className="flex shrink-0 items-center gap-4">
+                      <span className="whitespace-nowrap font-black tracking-tight text-green-400">{log.calories} kcal</span>
                       <button
                         onClick={() => handleDelete(log.id)}
                         className="p-2.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors active:scale-90"
