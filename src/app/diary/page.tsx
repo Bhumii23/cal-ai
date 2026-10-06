@@ -180,17 +180,17 @@ export default function DiaryPage() {
 
   if (authLoading) {
     return (
-      <main className="app-shell relative min-h-screen pb-48 text-white md:pb-8 md:pl-64">
+      <main className="app-shell relative min-h-screen pb-28 text-white md:pb-8 md:pl-64">
         <div className="p-6 md:px-8"><div className="skeleton h-48 rounded-[28px]" /></div>
       </main>
     );
   }
 
   return (
-    <main className="app-shell relative min-h-screen pb-48 font-sans text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
-      <div className="page-enter relative flex min-h-screen flex-col">
-        {/* Header */}
-        <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-white/10 bg-neutral-950/65 p-6 pt-8 backdrop-blur-2xl">
+    <main className="app-shell relative min-h-screen pb-28 font-sans text-white selection:bg-green-500/30 md:pb-8 md:pl-64">
+      <div className="flex min-h-screen flex-col">
+        {/* Header — sticky only, no animated/transformed ancestor so it stays put */}
+        <header className="sticky top-0 z-30 flex shrink-0 items-center gap-4 border-b border-white/10 bg-neutral-950/65 p-6 pt-8 backdrop-blur-2xl">
           <Link
             href="/"
             className="-ml-2 rounded-full p-2 transition-all duration-300 hover:bg-white/10 active:scale-90"
@@ -202,7 +202,7 @@ export default function DiaryPage() {
           </h1>
         </header>
 
-        <div className="flex flex-col gap-8 p-6 md:px-8 md:py-6">
+        <div className="page-enter flex flex-1 flex-col gap-8 p-6 md:px-8 md:py-6">
           {/* Upload Section */}
           <section className="flex flex-col gap-4">
             <h2 className="text-sm font-bold uppercase tracking-widest text-green-400">
@@ -363,18 +363,19 @@ export default function DiaryPage() {
               </div>
             )}
           </section>
-        </div>
 
-        {/* Footer Running Total */}
-        <div className="fixed bottom-20 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-transparent p-6 pointer-events-none md:bottom-0 md:left-64">
-          <div className="mx-auto">
-            <div className="glass-card pointer-events-auto flex items-center justify-between rounded-[24px] p-5">
+          {/* Total Calories — in normal flow, always AFTER the full food list.
+              Never fixed/absolute, so it moves down as items are added. */}
+          <div className="mt-2 flex flex-col">
+            <div className="glass-card flex items-center justify-between rounded-[24px] p-5">
               <span className="font-bold text-neutral-400 tracking-wide">Total Calories</span>
               <div className="flex items-end gap-1.5">
                 <span className="text-2xl font-black text-white tracking-tighter">{totalCalories}</span>
                 <span className="text-sm text-neutral-500 font-bold pb-0.5">kcal</span>
               </div>
             </div>
+            {/* Spacer so content never hides behind the fixed bottom nav */}
+            <div aria-hidden className="h-6 md:hidden" />
           </div>
         </div>
 
