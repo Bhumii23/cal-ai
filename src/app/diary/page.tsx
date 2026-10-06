@@ -41,6 +41,8 @@ export default function DiaryPage() {
   const [showToast, setShowToast] = useState(false);
   const [hasLoadedLogs, setHasLoadedLogs] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [showSourcePicker, setShowSourcePicker] = useState(false);
 
   // Load from Supabase (or localStorage fallback) after auth is ready
   useEffect(() => {
@@ -64,6 +66,7 @@ export default function DiaryPage() {
     const file = e.target.files?.[0];
     // Reset the input so picking the same photo again still fires onChange.
     e.target.value = "";
+    setShowSourcePicker(false);
     if (!file) return;
     // Keep uploads small so the base64 body doesn't exceed server limits.
     if (file.size > 4 * 1024 * 1024) {
@@ -210,6 +213,7 @@ export default function DiaryPage() {
             </h2>
             
             <div className="flex flex-col gap-4">
+              {/* Gallery: photo library / files */}
               <input
                 type="file"
                 accept="image/*"
@@ -217,10 +221,20 @@ export default function DiaryPage() {
                 ref={fileInputRef}
                 onChange={handleImageChange}
               />
+              {/* Camera: opens the device camera directly on mobile */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                ref={cameraInputRef}
+                onChange={handleImageChange}
+              />
 
               {!imagePreviewUrl ? (
+                <>
                 <button
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => setShowSourcePicker(true)}
                   className="glass-card group flex h-52 w-full flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-green-500/45 transition-all duration-300 hover:-translate-y-1 hover:border-green-400 hover:bg-green-500/10 active:scale-[0.98]"
                 >
                   <div className="rounded-full border border-green-500/25 bg-green-500/15 p-4 text-green-400 shadow-[0_0_30px_rgba(34,197,94,0.18)] transition-transform duration-300 group-hover:scale-110">
@@ -229,8 +243,35 @@ export default function DiaryPage() {
                   <span className="text-sm font-bold text-neutral-200">
                     Tap to upload food photo
                   </span>
-                  <span className="text-xs font-medium text-neutral-500">Camera roll or camera</span>
+                  <span className="text-xs font-medium text-neutral-500">Camera or gallery</span>
                 </button>
+
+                {/* Source picker: Camera vs Gallery */}
+                {showSourcePicker && (
+                  <div className="glass-card flex flex-col gap-3 rounded-[24px] p-4">
+                    <button
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-green-500 py-3.5 text-sm font-black text-black shadow-[0_0_24px_rgba(34,197,94,0.25)] transition-all duration-300 hover:bg-green-400 active:scale-[0.97]"
+                    >
+                      <Camera className="w-4 h-4" />
+                      Take Photo
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/10 py-3.5 text-sm font-semibold transition-all duration-300 hover:bg-white/15 active:scale-[0.97]"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Choose from Gallery
+                    </button>
+                    <button
+                      onClick={() => setShowSourcePicker(false)}
+                      className="py-1 text-xs font-bold text-neutral-500 hover:text-neutral-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                </>
               ) : (
                 <div className="flex flex-col gap-4">
                   <div className="glass-card relative flex w-full flex-col overflow-hidden rounded-[28px]">
@@ -255,7 +296,7 @@ export default function DiaryPage() {
                     {!analysisResult && !isAnalyzing && (
                       <div className="p-4 flex gap-3 bg-neutral-900/80 backdrop-blur-md">
                         <button
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => setShowSourcePicker(true)}
                         className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/10 py-3.5 text-sm font-semibold transition-all duration-300 hover:bg-white/15 active:scale-[0.97]"
                         >
                           <ImageIcon className="w-4 h-4" />
@@ -271,6 +312,32 @@ export default function DiaryPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Retake source picker: Camera vs Gallery */}
+                  {showSourcePicker && !isAnalyzing && !analysisResult && (
+                    <div className="glass-card flex flex-col gap-3 rounded-[24px] p-4">
+                      <button
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-green-500 py-3.5 text-sm font-black text-black shadow-[0_0_24px_rgba(34,197,94,0.25)] transition-all duration-300 hover:bg-green-400 active:scale-[0.97]"
+                      >
+                        <Camera className="w-4 h-4" />
+                        Take Photo
+                      </button>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/10 py-3.5 text-sm font-semibold transition-all duration-300 hover:bg-white/15 active:scale-[0.97]"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                        Choose from Gallery
+                      </button>
+                      <button
+                        onClick={() => setShowSourcePicker(false)}
+                        className="py-1 text-xs font-bold text-neutral-500 hover:text-neutral-200"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
 
                   {/* Result Card */}
                   {analysisResult && (
